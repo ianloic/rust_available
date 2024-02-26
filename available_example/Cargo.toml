@@ -1,0 +1,10 @@
+[package]
+name = "available_example"
+version = "0.1.0"
+edition = "2021"
+
+[build]
+rustc-cfg=['api_level_16']
+
+[dependencies]
+available_macros ={ path = "../available_macros" }

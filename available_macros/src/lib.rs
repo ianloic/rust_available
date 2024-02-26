@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
 use proc_macro as pm;
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
     parse::{ParseStream, Parser, Result},
@@ -71,13 +72,13 @@ impl Availability {
             .collect()
     }
 
-    fn cfg_args(&self) -> proc_macro2::TokenStream {
-        let mut level_list: Punctuated<Ident, Token![,]> = Default::default();
+    fn cfg_args(&self) -> TokenStream {
+        let mut level_list: Punctuated<TokenStream, Token![,]> = Default::default();
         for level_str in self.supported_levels().into_iter() {
-            level_list.push(ident(&format!("fuchsia_api_level_{level_str}")));
+            level_list.push(quote!(fuchsia_api_level=#level_str));
         }
 
-        proc_macro2::TokenStream::from(quote!(any(#level_list)))
+        TokenStream::from(quote!(any(#level_list)))
     }
 }
 
@@ -87,7 +88,7 @@ struct AvailableArgsParser;
 impl Parser for AvailableArgsParser {
     type Output = Availability;
 
-    fn parse2(self, tokens: proc_macro2::TokenStream) -> Result<Self::Output> {
+    fn parse2(self, tokens: TokenStream) -> Result<Self::Output> {
         let mut availability: Availability = Default::default();
 
         let parser = syn::meta::parser(|meta| {

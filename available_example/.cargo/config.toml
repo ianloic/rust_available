@@ -1,0 +1,2 @@
+[build]
+rustflags = ["--cfg", "fuchsia_api_level_16"]

@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use proc_macro::TokenStream;
+use proc_macro as pm;
 use quote::{quote, ToTokens};
 use syn::{
     parse::{ParseStream, Parser, Result},
@@ -29,11 +29,15 @@ lazy_static! {
 /// For a numeric API level return the Rust cfg string that will be set when compiling to target support for that API level.
 fn level_cfg(level: u32) -> String {
     match level {
-        API_LEVEL_NEXT => "api_level_head".to_owned(),
-        API_LEVEL_HEAD => "api_level_next".to_owned(),
-        API_LEVEL_MIN..=API_LEVEL_MAX => format!("api_level_{level:?}"),
+        API_LEVEL_NEXT => "head".to_owned(),
+        API_LEVEL_HEAD => "next".to_owned(),
+        API_LEVEL_MIN..=API_LEVEL_MAX => format!("{level}"),
         _ => panic!("Unexpected API level {level}"),
     }
+}
+
+fn ident(ident: &str) -> Ident {
+    Ident::new(ident, proc_macro2::Span::call_site())
 }
 
 #[derive(Default, Debug)]
@@ -70,8 +74,9 @@ impl Availability {
     fn cfg_args(&self) -> proc_macro2::TokenStream {
         let mut level_list: Punctuated<Ident, Token![,]> = Default::default();
         for level_str in self.supported_levels().into_iter() {
-            level_list.push(Ident::new(&level_str, proc_macro2::Span::call_site()));
+            level_list.push(ident(&format!("fuchsia_api_level_{level_str}")));
         }
+
         proc_macro2::TokenStream::from(quote!(any(#level_list)))
     }
 }
@@ -148,7 +153,7 @@ impl syn::visit_mut::VisitMut for AvailableVisitor {
 }
 
 #[proc_macro_attribute]
-pub fn available(args: TokenStream, item: TokenStream) -> TokenStream {
+pub fn available(args: pm::TokenStream, item: pm::TokenStream) -> pm::TokenStream {
     // Process all of the #[available()] inside this item
     let mut input = parse_macro_input!(item as Item);
     syn::visit_mut::visit_item_mut(&mut AvailableVisitor, &mut input);
@@ -156,12 +161,12 @@ pub fn available(args: TokenStream, item: TokenStream) -> TokenStream {
     let availability = parse_macro_input!(args with AvailableArgsParser);
     if availability.is_empty() {
         // If no availability was specified at the top-level, just return the block
-        TokenStream::from(input.to_token_stream())
+        pm::TokenStream::from(input.to_token_stream())
     } else {
         // Generate a #[cfg(...)] macro invocation before the item
         let cfg_args = availability.cfg_args();
 
-        TokenStream::from(quote!(
+        pm::TokenStream::from(quote!(
             #[cfg(#cfg_args)]
             #input))
     }
